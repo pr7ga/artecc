@@ -18,6 +18,8 @@ if "numero_escolhido" not in st.session_state:
     st.session_state.numero_escolhido = None
 if "escolha_letra" not in st.session_state:
     st.session_state.escolha_letra = None
+if "placar" not in st.session_state:
+    st.session_state.placar = {"acertos": 0, "erros": 0}
 
 # -----------------------------
 # Configuração pelo Master
@@ -42,6 +44,13 @@ if st.session_state.fase == "config":
 # -----------------------------
 elif st.session_state.fase == "esperando_numero":
     st.header("Rodada de Jogo")
+
+    # Placar
+    st.subheader("📊 Placar")
+    st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
+    if st.button("Resetar Placar"):
+        st.session_state.placar = {"acertos": 0, "erros": 0}
+        st.rerun()
 
     # Criar novo mapa se necessário
     if not st.session_state.mapa_random:
@@ -78,31 +87,4 @@ elif st.session_state.fase == "tocando_audio":
     st.audio(arquivo.read(), format="audio/mpeg")
 
     opcoes = {letra: v["nome"] for letra, v in zip("abcde", st.session_state.arquivos.values())}
-    st.session_state.escolha_letra = st.radio("Qual é a resposta correta?", list(opcoes.keys()), key="resposta_jogador")
-
-    if st.button("Responder"):
-        # Guardar resposta e ir para fase de resultado
-        st.session_state.fase = "resultado"
-        st.rerun()
-
-# -----------------------------
-# Etapa: Mostrar resultado
-# -----------------------------
-elif st.session_state.fase == "resultado":
-    opcoes = {letra: v["nome"] for letra, v in zip("abcde", st.session_state.arquivos.values())}
-    resposta_letra = list(opcoes.keys())[list(opcoes.values()).index(
-        st.session_state.arquivos[st.session_state.resposta_correta]["nome"]
-    )]
-
-    if st.session_state.escolha_letra == resposta_letra:
-        st.success("🎉 ACERTOU!")
-    else:
-        st.error("❌ ERROU!")
-
-    if st.button("Jogar novamente"):
-        st.session_state.mapa_random = {}
-        st.session_state.numero_escolhido = None
-        st.session_state.escolha_letra = None
-        st.session_state.resposta_correta = None
-        st.session_state.fase = "esperando_numero"
-        st.rerun()
+    st.session_state.escolha_letra = st.radio("Qual é a resposta correta?", list(opcoes.keys()), key="resposta
