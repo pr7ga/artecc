@@ -34,7 +34,15 @@ if "modo_arquivos" not in st.session_state:
 # -----------------------------
 # UI
 # -----------------------------
-st.title("🎵 ARTECC 2025 - 3º Ano - Ambientes Sonoros 🎵")
+st.markdown(
+    """
+    <div style='text-align: center; line-height: 1.2'>
+        <h1 style='font-size:48px; margin:0;'>ARTECC 2025 - 3º Ano</h1>
+        <h2 style='font-size:36px; margin:0;'>🎵 Ambientes Sonoros 🎵</h2>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # -----------------------------
 # Escolha do modo de arquivos
