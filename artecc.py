@@ -1,8 +1,11 @@
 # app.py
 import streamlit as st
 import random
+import os
 
 st.set_page_config(page_title="Jogo de Áudio", layout="centered")
+
+PASTA_ARQUIVOS = "arquivos_mp3"  # pasta no repositório
 
 # -----------------------------
 # Inicialização de sessão
@@ -12,7 +15,7 @@ if "arquivos" not in st.session_state:
 if "fase" not in st.session_state:
     st.session_state.fase = "config"  # config, esperando_numero, tocando_audio, resultado
 if "arquivos_rodada" not in st.session_state:
-    st.session_state.arquivos_rodada = {}  # 1..5 mapeados para os arquivos da rodada
+    st.session_state.arquivos_rodada = {}  # 1..5 para rodada
 if "mapa_random" not in st.session_state:
     st.session_state.mapa_random = {}
 if "resposta_correta" not in st.session_state:
@@ -25,6 +28,8 @@ if "placar" not in st.session_state:
     st.session_state.placar = {"acertos": 0, "erros": 0}
 if "placar_incrementado" not in st.session_state:
     st.session_state.placar_incrementado = False
+if "modo_arquivos" not in st.session_state:
+    st.session_state.modo_arquivos = None  # 'upload' ou 'repositorio'
 
 # -----------------------------
 # UI
@@ -32,35 +37,61 @@ if "placar_incrementado" not in st.session_state:
 st.title("🎵 Jogo de Áudio")
 
 # -----------------------------
-# Configuração pelo Master
+# Escolha do modo de arquivos
 # -----------------------------
-if st.session_state.fase == "config":
-    st.header("Configuração do Master")
+if st.session_state.fase == "config" and st.session_state.modo_arquivos is None:
+    st.header("Escolha a fonte dos arquivos de áudio")
+    escolha = st.radio(
+        "Deseja usar os arquivos da pasta no repositório ou enviar pelo master?",
+        ["Pasta no repositório", "Upload pelo master"]
+    )
+    if st.button("Confirmar escolha"):
+        st.session_state.modo_arquivos = "repositorio" if escolha == "Pasta no repositório" else "upload"
+        st.rerun()
 
+# -----------------------------
+# Carregar arquivos da pasta do repositório
+# -----------------------------
+if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == "config":
+    st.header("Arquivos carregados da pasta do repositório")
+    arquivos = {}
+    if os.path.exists(PASTA_ARQUIVOS):
+        for filename in os.listdir(PASTA_ARQUIVOS):
+            if filename.endswith(".mp3"):
+                filepath = os.path.join(PASTA_ARQUIVOS, filename)
+                with open(filepath, "rb") as f:
+                    arquivos[filename] = {"bytes": f.read(), "nome": filename}
+        if len(arquivos) < 5:
+            st.warning("É necessário ter pelo menos 5 arquivos MP3 na pasta.")
+        else:
+            st.session_state.arquivos = arquivos
+            st.write(f"{len(arquivos)} arquivos carregados.")
+            if st.button("Iniciar Jogo"):
+                st.session_state.fase = "esperando_numero"
+                st.rerun()
+    else:
+        st.error(f"A pasta '{PASTA_ARQUIVOS}' não existe no repositório.")
+
+# -----------------------------
+# Upload pelo master
+# -----------------------------
+elif st.session_state.modo_arquivos == "upload" and st.session_state.fase == "config":
+    st.header("Upload de arquivos pelo master (mínimo 5)")
     uploaded_files = st.file_uploader(
-        "Envie seus arquivos MP3 (mínimo 5)",
+        "Envie seus arquivos MP3",
         type=["mp3"],
         accept_multiple_files=True
     )
-
     if uploaded_files:
         for file in uploaded_files:
             key = file.name
             if key not in st.session_state.arquivos:
-                st.session_state.arquivos[key] = {"bytes": file.read(), "nome": file.name}
-
-        st.write("### Nomeie os arquivos como quiser:")
-        for key in st.session_state.arquivos:
-            nome_atual = st.session_state.arquivos[key]["nome"]
-            novo_nome = st.text_input(f"Nome para {key}", value=nome_atual, key=f"nome_{key}")
-            st.session_state.arquivos[key]["nome"] = novo_nome
+                st.session_state.arquivos[key] = {"bytes": file.read(), "nome": key}
 
     st.write(f"Arquivos carregados: {len(st.session_state.arquivos)}")
     if len(st.session_state.arquivos) >= 5:
         if st.button("Iniciar Jogo"):
             st.session_state.fase = "esperando_numero"
-            st.session_state.mapa_random = {}
-            st.session_state.placar_incrementado = False
             st.rerun()
 
 # -----------------------------
@@ -77,9 +108,8 @@ elif st.session_state.fase == "esperando_numero":
         st.rerun()
 
     if len(st.session_state.arquivos) < 5:
-        st.warning("Envie pelo menos 5 arquivos para jogar.")
+        st.warning("É necessário pelo menos 5 arquivos para jogar.")
     else:
-        # Sorteia 5 arquivos aleatórios para a rodada
         if not st.session_state.arquivos_rodada:
             arquivos_sorteados = random.sample(list(st.session_state.arquivos.keys()), 5)
             st.session_state.arquivos_rodada = {
@@ -124,7 +154,6 @@ elif st.session_state.fase == "tocando_audio":
     st.subheader("O áudio será reproduzido abaixo:")
     st.audio(arquivo_bytes, format="audio/mpeg")
 
-    # Gerar opções a..e e mostrar "a - nome"
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letter = {}
     display_opcoes = []
