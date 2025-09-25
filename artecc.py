@@ -13,15 +13,13 @@ PASTA_ARQUIVOS = "arquivos_mp3"  # pasta no repositório
 if "arquivos" not in st.session_state:
     st.session_state.arquivos = {}  # {key: {"bytes":..., "nome":...}}
 if "fase" not in st.session_state:
-    st.session_state.fase = "config"  # config, esperando_numero, tocando_audio, resultado
+    st.session_state.fase = "config"  # config, tocando_audio, resultado
 if "arquivos_rodada" not in st.session_state:
     st.session_state.arquivos_rodada = {}  # 1..5 para rodada
 if "mapa_random" not in st.session_state:
     st.session_state.mapa_random = {}
 if "resposta_correta" not in st.session_state:
     st.session_state.resposta_correta = None
-if "numero_escolhido" not in st.session_state:
-    st.session_state.numero_escolhido = None
 if "escolha_letra" not in st.session_state:
     st.session_state.escolha_letra = None
 if "placar" not in st.session_state:
@@ -32,7 +30,7 @@ if "modo_arquivos" not in st.session_state:
     st.session_state.modo_arquivos = None  # 'upload' ou 'repositorio'
 
 # -----------------------------
-# UI
+# UI - Título centralizado em duas linhas
 # -----------------------------
 st.markdown(
     """
@@ -75,7 +73,7 @@ if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == 
             st.session_state.arquivos = arquivos
             st.write(f"{len(arquivos)} arquivos carregados.")
             if st.button("Iniciar Jogo"):
-                st.session_state.fase = "esperando_numero"
+                st.session_state.fase = "tocando_audio"
                 st.rerun()
     else:
         st.error(f"A pasta '{PASTA_ARQUIVOS}' não existe no repositório.")
@@ -99,69 +97,40 @@ elif st.session_state.modo_arquivos == "upload" and st.session_state.fase == "co
     st.write(f"Arquivos carregados: {len(st.session_state.arquivos)}")
     if len(st.session_state.arquivos) >= 5:
         if st.button("Iniciar Jogo"):
-            st.session_state.fase = "esperando_numero"
-            st.rerun()
-
-# -----------------------------
-# Etapa: Jogador escolhe número
-# -----------------------------
-elif st.session_state.fase == "esperando_numero":
-    st.header("Rodada de Jogo")
-
-    # Placar + reset
-    st.subheader("📊 Placar")
-    st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
-    if st.button("Resetar Placar"):
-        st.session_state.placar = {"acertos": 0, "erros": 0}
-        st.rerun()
-
-    if len(st.session_state.arquivos) < 5:
-        st.warning("É necessário pelo menos 5 arquivos para jogar.")
-    else:
-        if not st.session_state.arquivos_rodada:
-            arquivos_sorteados = random.sample(list(st.session_state.arquivos.keys()), 5)
-            st.session_state.arquivos_rodada = {
-                i+1: st.session_state.arquivos[k] for i, k in enumerate(arquivos_sorteados)
-            }
-            st.session_state.mapa_random = {}
-            st.session_state.numero_escolhido = None
-            st.session_state.resposta_correta = None
-            st.session_state.escolha_letra = None
-            st.session_state.placar_incrementado = False
-
-        escolha_num = st.radio(
-            "Você quer escolher um número de 1 a 5 ou deixar o sistema escolher?",
-            ["Escolher eu mesmo", "Sistema escolher"],
-            key="modo_escolha"
-        )
-
-        if escolha_num == "Escolher eu mesmo":
-            numero_escolhido = st.number_input("Escolha um número (1-5)", min_value=1, max_value=5, step=1)
-        else:
-            numero_escolhido = random.choice(range(1, 6))
-            st.write(f"O sistema escolheu o número: **{numero_escolhido}**")
-
-        if st.button("Confirmar escolha"):
-            st.session_state.numero_escolhido = numero_escolhido
-            numeros = list(st.session_state.arquivos_rodada.keys())
-            random.shuffle(numeros)
-            st.session_state.mapa_random = {i+1: numeros[i] for i in range(5)}
-            idx_real = st.session_state.mapa_random[numero_escolhido]
-            st.session_state.resposta_correta = idx_real
             st.session_state.fase = "tocando_audio"
-            st.session_state.placar_incrementado = False
             st.rerun()
 
 # -----------------------------
 # Etapa: Toca o áudio e jogador escolhe letra
 # -----------------------------
 elif st.session_state.fase == "tocando_audio":
-    idx_real = st.session_state.resposta_correta
-    arquivo_bytes = st.session_state.arquivos_rodada[idx_real]["bytes"]
+    # Sorteia 5 arquivos da rodada se ainda não sorteados
+    if not st.session_state.arquivos_rodada:
+        arquivos_sorteados = random.sample(list(st.session_state.arquivos.keys()), 5)
+        st.session_state.arquivos_rodada = {
+            i+1: st.session_state.arquivos[k] for i, k in enumerate(arquivos_sorteados)
+        }
+        st.session_state.mapa_random = {}
+        st.session_state.resposta_correta = None
+        st.session_state.escolha_letra = None
+        st.session_state.placar_incrementado = False
 
+    # Sistema escolhe número aleatório para a rodada
+    numero_escolhido = random.choice(range(1, 6))
+    st.session_state.numero_escolhido = numero_escolhido
+
+    # Randomiza mapa e define resposta correta
+    numeros = list(st.session_state.arquivos_rodada.keys())
+    random.shuffle(numeros)
+    st.session_state.mapa_random = {i+1: numeros[i] for i in range(5)}
+    idx_real = st.session_state.mapa_random[numero_escolhido]
+    st.session_state.resposta_correta = idx_real
+
+    arquivo_bytes = st.session_state.arquivos_rodada[idx_real]["bytes"]
     st.subheader("Clique no play e tente identificar qual o ambiente:")
     st.audio(arquivo_bytes, format="audio/mpeg")
 
+    # Exibe opções
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letter = {}
     display_opcoes = []
@@ -226,6 +195,6 @@ elif st.session_state.fase == "resultado":
         st.session_state.numero_escolhido = None
         st.session_state.escolha_letra = None
         st.session_state.resposta_correta = None
-        st.session_state.fase = "esperando_numero"
+        st.session_state.fase = "tocando_audio"
         st.session_state.placar_incrementado = False
         st.rerun()
