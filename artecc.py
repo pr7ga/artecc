@@ -8,15 +8,16 @@ st.set_page_config(page_title="Jogo de Áudio", layout="centered")
 # -----------------------------
 if "arquivos" not in st.session_state:
     st.session_state.arquivos = {}  # {1: {"file":..., "nome":...}, ...}
-if "rodada" not in st.session_state:
-    st.session_state.rodada = 0
+if "fase" not in st.session_state:
+    st.session_state.fase = "config"  # config, esperando_numero, tocando_audio, resultado
 if "mapa_random" not in st.session_state:
     st.session_state.mapa_random = {}
 if "resposta_correta" not in st.session_state:
     st.session_state.resposta_correta = None
-if "fase" not in st.session_state:
-    st.session_state.fase = "config"  # config, jogo, resultado
-
+if "numero_escolhido" not in st.session_state:
+    st.session_state.numero_escolhido = None
+if "escolha_letra" not in st.session_state:
+    st.session_state.escolha_letra = None
 
 # -----------------------------
 # Configuração pelo Master
@@ -33,23 +34,25 @@ if st.session_state.fase == "config":
 
     if len(st.session_state.arquivos) == 5:
         if st.button("Iniciar Jogo"):
-            st.session_state.fase = "jogo"
+            st.session_state.fase = "esperando_numero"
             st.rerun()
 
 # -----------------------------
-# Jogo do Jogador
+# Etapa: Jogador escolhe número
 # -----------------------------
-elif st.session_state.fase == "jogo":
+elif st.session_state.fase == "esperando_numero":
     st.header("Rodada de Jogo")
 
-    # Randomização do mapa de números → arquivos
-    numeros = list(st.session_state.arquivos.keys())
-    random.shuffle(numeros)
-    st.session_state.mapa_random = {i+1: numeros[i] for i in range(5)}
+    # Criar novo mapa se necessário
+    if not st.session_state.mapa_random:
+        numeros = list(st.session_state.arquivos.keys())
+        random.shuffle(numeros)
+        st.session_state.mapa_random = {i + 1: numeros[i] for i in range(5)}
 
     escolha_num = st.radio(
         "Você quer escolher um número de 1 a 5 ou deixar o sistema escolher?",
-        ["Escolher eu mesmo", "Sistema escolher"]
+        ["Escolher eu mesmo", "Sistema escolher"],
+        key="modo_escolha"
     )
 
     if escolha_num == "Escolher eu mesmo":
@@ -59,28 +62,47 @@ elif st.session_state.fase == "jogo":
         st.write(f"O sistema escolheu o número: **{numero_escolhido}**")
 
     if st.button("Confirmar escolha"):
+        st.session_state.numero_escolhido = numero_escolhido
         idx_real = st.session_state.mapa_random[numero_escolhido]
-        arquivo = st.session_state.arquivos[idx_real]["file"]
         st.session_state.resposta_correta = idx_real
+        st.session_state.fase = "tocando_audio"
+        st.rerun()
 
-        # Tocar áudio
-        st.audio(arquivo.read(), format="audio/mpeg")
+# -----------------------------
+# Etapa: Toca o áudio e jogador escolhe letra
+# -----------------------------
+elif st.session_state.fase == "tocando_audio":
+    idx_real = st.session_state.resposta_correta
+    arquivo = st.session_state.arquivos[idx_real]["file"]
 
-        # Mostrar opções
-        st.subheader("Qual é a resposta correta?")
-        opcoes = {letra: v["nome"] for letra, v in zip("abcde", st.session_state.arquivos.values())}
-        escolha_letra = st.radio("Escolha uma opção:", list(opcoes.keys()), key="escolha_letra")
+    st.audio(arquivo.read(), format="audio/mpeg")
 
-        if st.button("Responder"):
-            # Verificar se acertou
-            resposta_letra = list(opcoes.keys())[list(opcoes.values()).index(
-                st.session_state.arquivos[st.session_state.resposta_correta]["nome"]
-            )]
-            if escolha_letra == resposta_letra:
-                st.success("🎉 ACERTOU!")
-            else:
-                st.error("❌ ERROU!")
+    opcoes = {letra: v["nome"] for letra, v in zip("abcde", st.session_state.arquivos.values())}
+    st.session_state.escolha_letra = st.radio("Qual é a resposta correta?", list(opcoes.keys()), key="resposta_jogador")
 
-            if st.button("Jogar novamente"):
-                st.session_state.fase = "jogo"
-                st.rerun()
+    if st.button("Responder"):
+        # Guardar resposta e ir para fase de resultado
+        st.session_state.fase = "resultado"
+        st.rerun()
+
+# -----------------------------
+# Etapa: Mostrar resultado
+# -----------------------------
+elif st.session_state.fase == "resultado":
+    opcoes = {letra: v["nome"] for letra, v in zip("abcde", st.session_state.arquivos.values())}
+    resposta_letra = list(opcoes.keys())[list(opcoes.values()).index(
+        st.session_state.arquivos[st.session_state.resposta_correta]["nome"]
+    )]
+
+    if st.session_state.escolha_letra == resposta_letra:
+        st.success("🎉 ACERTOU!")
+    else:
+        st.error("❌ ERROU!")
+
+    if st.button("Jogar novamente"):
+        st.session_state.mapa_random = {}
+        st.session_state.numero_escolhido = None
+        st.session_state.escolha_letra = None
+        st.session_state.resposta_correta = None
+        st.session_state.fase = "esperando_numero"
+        st.rerun()
