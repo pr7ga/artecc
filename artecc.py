@@ -5,7 +5,7 @@ import os
 
 st.set_page_config(page_title="ARTECC 2025 - 3º Ano - Ambientes Sonoros", layout="centered")
 
-PASTA_ARQUIVOS = "arquivos_mp3"  # pasta no repositório
+PASTA_ARQUIVOS = "arquivos_mp3"
 
 # -----------------------------
 # Inicialização de sessão
@@ -28,13 +28,12 @@ if "modo_arquivos" not in st.session_state:
     st.session_state.modo_arquivos = None
 
 # -----------------------------
-# CSS para centralizar e cards
+# CSS para cards
 # -----------------------------
 st.markdown(
     """
     <style>
     .card {
-        display: inline-block;
         border-radius: 15px;
         padding: 20px;
         margin: 5px;
@@ -50,9 +49,6 @@ st.markdown(
         transform: scale(1.05);
         background-color: #d0e0ff;
     }
-    .centered {
-        text-align: center;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -63,7 +59,7 @@ st.markdown(
 # -----------------------------
 st.markdown(
     """
-    <div class='centered' style='line-height:1.2'>
+    <div style='text-align: center; line-height: 1.2'>
         <h1 style='font-size:48px; margin:0;'>ARTECC 2025 - 3º Ano</h1>
         <h2 style='font-size:36px; margin:0;'>🎵 Ambientes Sonoros 🎵</h2>
     </div>
@@ -146,48 +142,47 @@ elif st.session_state.fase == "tocando_audio":
     arquivo_bytes = st.session_state.arquivos_rodada[st.session_state.resposta_correta]["bytes"]
 
     # -----------------------------
-    # Placar centralizado
+    # Placar em linha horizontal
     # -----------------------------
-    st.markdown("<div class='centered'>", unsafe_allow_html=True)
-    st.metric("✅ Acertos", st.session_state.placar["acertos"])
-    st.metric("❌ Erros", st.session_state.placar["erros"])
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("✅ Acertos", st.session_state.placar["acertos"])
+    with col2:
+        st.metric("❌ Erros", st.session_state.placar["erros"])
     if st.button("🔄 Resetar Placar"):
         st.session_state.placar = {"acertos": 0, "erros": 0}
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 
     # -----------------------------
-    # Player centralizado
+    # Player abaixo
     # -----------------------------
-    st.markdown("<div class='centered'>", unsafe_allow_html=True)
     st.subheader("🎵 Ouça o áudio e tente identificar o ambiente")
     st.audio(arquivo_bytes, format="audio/mpeg")
-    st.markdown("</div>", unsafe_allow_html=True)
 
     # -----------------------------
-    # Opções centralizadas
+    # Opções em cards
     # -----------------------------
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letra = {}
     st.subheader("Escolha uma opção:")
-    st.markdown("<div class='centered'>", unsafe_allow_html=True)
+    cols = st.columns(5)
     for i, (file_key, meta) in enumerate(sorted_items):
         letra = chr(ord("a") + i)
         filekey_to_letra[file_key] = letra
         nome_limpo = os.path.splitext(meta["nome"])[0]
-        if st.button(nome_limpo, key=f"opt_{i}"):
-            st.session_state.escolha_letra = letra
-            if not st.session_state.placar_incrementado:
-                resposta_certa = st.session_state.resposta_correta
-                letra_correta = filekey_to_letra[resposta_certa]
-                if st.session_state.escolha_letra == letra_correta:
-                    st.session_state.placar["acertos"] += 1
-                else:
-                    st.session_state.placar["erros"] += 1
-                st.session_state.placar_incrementado = True
-            st.session_state.fase = "resultado"
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+        with cols[i]:
+            if st.button(nome_limpo, key=f"opt_{i}"):
+                st.session_state.escolha_letra = letra
+                if not st.session_state.placar_incrementado:
+                    resposta_certa = st.session_state.resposta_correta
+                    letra_correta = filekey_to_letra[resposta_certa]
+                    if st.session_state.escolha_letra == letra_correta:
+                        st.session_state.placar["acertos"] += 1
+                    else:
+                        st.session_state.placar["erros"] += 1
+                    st.session_state.placar_incrementado = True
+                st.session_state.fase = "resultado"
+                st.rerun()
 
 # -----------------------------
 # Resultado
@@ -215,9 +210,9 @@ elif st.session_state.fase == "resultado":
         )
         st.info(f"A resposta correta era: **{nome_correto}**")
 
-    st.markdown("<div class='centered'>", unsafe_allow_html=True)
     st.subheader("📊 Placar Atual")
     st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
+
     if st.button("🔁 Jogar novamente"):
         st.session_state.arquivos_rodada = {}
         st.session_state.resposta_correta = None
@@ -225,4 +220,3 @@ elif st.session_state.fase == "resultado":
         st.session_state.placar_incrementado = False
         st.session_state.fase = "tocando_audio"
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
