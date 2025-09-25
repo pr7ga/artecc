@@ -16,8 +16,6 @@ if "fase" not in st.session_state:
     st.session_state.fase = "config"  # config, tocando_audio, resultado
 if "arquivos_rodada" not in st.session_state:
     st.session_state.arquivos_rodada = {}  # 1..5 para rodada
-if "mapa_random" not in st.session_state:
-    st.session_state.mapa_random = {}
 if "resposta_correta" not in st.session_state:
     st.session_state.resposta_correta = None
 if "escolha_letra" not in st.session_state:
@@ -110,27 +108,16 @@ elif st.session_state.fase == "tocando_audio":
         st.session_state.arquivos_rodada = {
             i+1: st.session_state.arquivos[k] for i, k in enumerate(arquivos_sorteados)
         }
-        st.session_state.mapa_random = {}
-        st.session_state.resposta_correta = None
-        st.session_state.escolha_letra = None
+        # Sorteia o arquivo que será a resposta correta
+        st.session_state.resposta_correta = random.choice(list(st.session_state.arquivos_rodada.keys()))
         st.session_state.placar_incrementado = False
+        st.session_state.escolha_letra = None
 
-    # Sistema escolhe número aleatório para a rodada
-    numero_escolhido = random.choice(range(1, 6))
-    st.session_state.numero_escolhido = numero_escolhido
-
-    # Randomiza mapa e define resposta correta
-    numeros = list(st.session_state.arquivos_rodada.keys())
-    random.shuffle(numeros)
-    st.session_state.mapa_random = {i+1: numeros[i] for i in range(5)}
-    idx_real = st.session_state.mapa_random[numero_escolhido]
-    st.session_state.resposta_correta = idx_real
-
-    arquivo_bytes = st.session_state.arquivos_rodada[idx_real]["bytes"]
+    arquivo_bytes = st.session_state.arquivos_rodada[st.session_state.resposta_correta]["bytes"]
     st.subheader("Clique no play e tente identificar qual o ambiente:")
     st.audio(arquivo_bytes, format="audio/mpeg")
 
-    # Exibe opções
+    # Exibe opções (as letras são apenas para o jogador escolher)
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letter = {}
     display_opcoes = []
@@ -191,10 +178,8 @@ elif st.session_state.fase == "resultado":
 
     if st.button("Jogar novamente"):
         st.session_state.arquivos_rodada = {}
-        st.session_state.mapa_random = {}
-        st.session_state.numero_escolhido = None
-        st.session_state.escolha_letra = None
         st.session_state.resposta_correta = None
-        st.session_state.fase = "tocando_audio"
+        st.session_state.escolha_letra = None
         st.session_state.placar_incrementado = False
+        st.session_state.fase = "tocando_audio"
         st.rerun()
