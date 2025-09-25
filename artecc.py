@@ -3,7 +3,7 @@ import streamlit as st
 import random
 import os
 
-st.set_page_config(page_title="Jogo de Áudio", layout="centered")
+st.set_page_config(page_title="ARTECC 2025 - 3º Ano - Ambientes Sonoros", layout="centered")
 
 PASTA_ARQUIVOS = "arquivos_mp3"  # pasta no repositório
 
