@@ -34,7 +34,7 @@ if "modo_arquivos" not in st.session_state:
 # -----------------------------
 # UI
 # -----------------------------
-st.title("🎵 Jogo de Áudio")
+st.title("🎵 ARTECC 2025 - 3º Ano - Ambientes Sonoros 🎵")
 
 # -----------------------------
 # Escolha do modo de arquivos
