@@ -21,6 +21,8 @@ if "escolha_letra" not in st.session_state:
     st.session_state.escolha_letra = None
 if "placar" not in st.session_state:
     st.session_state.placar = {"acertos": 0, "erros": 0}
+if "placar_incrementado" not in st.session_state:
+    st.session_state.placar_incrementado = False  # variável auxiliar para evitar contagem múltipla
 
 # -----------------------------
 # UI
@@ -75,6 +77,7 @@ elif st.session_state.fase == "esperando_numero":
         st.session_state.numero_escolhido = None
         st.session_state.resposta_correta = None
         st.session_state.escolha_letra = None
+        st.session_state.placar_incrementado = False  # resetar flag para nova rodada
 
     escolha_num = st.radio(
         "Você quer escolher um número de 1 a 5 ou deixar o sistema escolher?",
@@ -93,6 +96,7 @@ elif st.session_state.fase == "esperando_numero":
         idx_real = st.session_state.mapa_random[numero_escolhido]
         st.session_state.resposta_correta = idx_real
         st.session_state.fase = "tocando_audio"
+        st.session_state.placar_incrementado = False  # garantir flag zerada
         st.rerun()
 
 # -----------------------------
@@ -124,7 +128,19 @@ elif st.session_state.fase == "tocando_audio":
     )
 
     if st.button("Responder"):
+        # extrair apenas a letra
         st.session_state.escolha_letra = st.session_state.escolha_letra.split(" - ")[0]
+
+        # Incrementar placar apenas uma vez por rodada
+        if not st.session_state.placar_incrementado:
+            corret_key = st.session_state.resposta_correta
+            resposta_letra_correta = filekey_to_letter[corret_key]
+            if st.session_state.escolha_letra == resposta_letra_correta:
+                st.session_state.placar["acertos"] += 1
+            else:
+                st.session_state.placar["erros"] += 1
+            st.session_state.placar_incrementado = True  # marca que já incrementou
+
         st.session_state.fase = "resultado"
         st.rerun()
 
@@ -144,11 +160,9 @@ elif st.session_state.fase == "resultado":
 
     if st.session_state.escolha_letra == resposta_letra_correta:
         st.success("🎉 ACERTOU!")
-        st.session_state.placar["acertos"] += 1
     else:
         st.error("❌ ERROU!")
         st.info(f"A resposta correta era: **{resposta_letra_correta} - {resposta_nome_correta}**")
-        st.session_state.placar["erros"] += 1
 
     st.subheader("📊 Placar Atual")
     st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
@@ -159,4 +173,5 @@ elif st.session_state.fase == "resultado":
         st.session_state.escolha_letra = None
         st.session_state.resposta_correta = None
         st.session_state.fase = "esperando_numero"
+        st.session_state.placar_incrementado = False
         st.rerun()
