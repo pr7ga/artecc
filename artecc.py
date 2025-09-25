@@ -72,4 +72,92 @@ elif st.session_state.fase == "esperando_numero":
         st.rerun()
 
     # Criar novo mapa se necessário (mapa: número de 1-5 -> índice do arquivo)
-    if not st.session_sta_
+    if not st.session_state.mapa_random:
+        numeros = list(st.session_state.arquivos.keys())  # deve ser [1,2,3,4,5]
+        random.shuffle(numeros)
+        st.session_state.mapa_random = {i + 1: numeros[i] for i in range(5)}
+        # limpa escolhas anteriores
+        st.session_state.numero_escolhido = None
+        st.session_state.resposta_correta = None
+        st.session_state.escolha_letra = None
+
+    escolha_num = st.radio(
+        "Você quer escolher um número de 1 a 5 ou deixar o sistema escolher?",
+        ["Escolher eu mesmo", "Sistema escolher"],
+        key="modo_escolha"
+    )
+
+    if escolha_num == "Escolher eu mesmo":
+        numero_escolhido = st.number_input("Escolha um número (1-5)", min_value=1, max_value=5, step=1)
+    else:
+        numero_escolhido = random.choice(range(1, 6))
+        st.write(f"O sistema escolheu o número: **{numero_escolhido}**")
+
+    if st.button("Confirmar escolha"):
+        st.session_state.numero_escolhido = numero_escolhido
+        idx_real = st.session_state.mapa_random[numero_escolhido]  # índice real do arquivo (1..5)
+        st.session_state.resposta_correta = idx_real
+        st.session_state.fase = "tocando_audio"
+        st.rerun()
+
+# -----------------------------
+# Etapa: Toca o áudio e jogador escolhe letra
+# -----------------------------
+elif st.session_state.fase == "tocando_audio":
+    idx_real = st.session_state.resposta_correta
+    arquivo_bytes = st.session_state.arquivos[idx_real]["bytes"]
+
+    st.subheader("O áudio será reproduzido abaixo:")
+    st.audio(arquivo_bytes, format="audio/mpeg")
+
+    # Gerar opções a..e de forma estável (ordenando keys dos arquivos)
+    sorted_items = sorted(st.session_state.arquivos.items(), key=lambda x: x[0])  # [(1, {...}), (2,...), ...]
+    opcoes = {}
+    filekey_to_letter = {}
+    for i, (file_key, meta) in enumerate(sorted_items):
+        letra = chr(ord("a") + i)
+        opcoes[letra] = meta["nome"]
+        filekey_to_letter[file_key] = letra
+
+    st.session_state.escolha_letra = st.radio("Qual é a resposta correta?", list(opcoes.keys()), key="resposta_jogador")
+
+    if st.button("Responder"):
+        st.session_state.fase = "resultado"
+        st.rerun()
+
+# -----------------------------
+# Etapa: Mostrar resultado
+# -----------------------------
+elif st.session_state.fase == "resultado":
+    # reconstrói as mesmas opções para garantir consistência
+    sorted_items = sorted(st.session_state.arquivos.items(), key=lambda x: x[0])
+    opcoes = {}
+    filekey_to_letter = {}
+    for i, (file_key, meta) in enumerate(sorted_items):
+        letra = chr(ord("a") + i)
+        opcoes[letra] = meta["nome"]
+        filekey_to_letter[file_key] = letra
+
+    corret_key = st.session_state.resposta_correta  # ex: 3  (chave do arquivo 1..5)
+    resposta_letra_correta = filekey_to_letter[corret_key]
+    resposta_nome_correta = st.session_state.arquivos[corret_key]["nome"]
+
+    if st.session_state.escolha_letra == resposta_letra_correta:
+        st.success("🎉 ACERTOU!")
+        st.session_state.placar["acertos"] += 1
+    else:
+        st.error("❌ ERROU!")
+        st.info(f"A resposta correta era: **{resposta_letra_correta} → {resposta_nome_correta}**")
+        st.session_state.placar["erros"] += 1
+
+    st.subheader("📊 Placar Atual")
+    st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
+
+    if st.button("Jogar novamente"):
+        # reseta apenas o necessário para uma nova rodada
+        st.session_state.mapa_random = {}
+        st.session_state.numero_escolhido = None
+        st.session_state.escolha_letra = None
+        st.session_state.resposta_correta = None
+        st.session_state.fase = "esperando_numero"
+        st.rerun()
