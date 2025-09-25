@@ -152,18 +152,18 @@ elif st.session_state.fase == "tocando_audio":
             st.session_state.placar = {"acertos": 0, "erros": 0}
             st.rerun()
 
-    # Exibe opções como cards coloridos
+    # Exibe opções como botões simples, sem letras e sem extensão
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letter = {}
-    display_opcoes = []
 
     st.subheader("Escolha uma opção:")
     cols = st.columns(5)
     for i, (file_key, meta) in enumerate(sorted_items):
-        letra = chr(ord("a") + i)
+        letra = chr(ord("a") + i)  # ainda necessário internamente
         filekey_to_letter[file_key] = letra
+        nome_limpo = os.path.splitext(meta["nome"])[0]  # remove .mp3
         with cols[i]:
-            if st.button(f"{letra} - {meta['nome']}", key=f"opt_{letra}"):
+            if st.button(nome_limpo, key=f"opt_{i}"):
                 st.session_state.escolha_letra = letra
                 if not st.session_state.placar_incrementado:
                     resposta_letra_correta = filekey_to_letter[st.session_state.resposta_correta]
@@ -187,7 +187,7 @@ elif st.session_state.fase == "resultado":
 
     corret_key = st.session_state.resposta_correta
     resposta_letra_correta = filekey_to_letter[corret_key]
-    resposta_nome_correta = st.session_state.arquivos_rodada[corret_key]["nome"]
+    resposta_nome_correta = os.path.splitext(st.session_state.arquivos_rodada[corret_key]["nome"])[0]
 
     if st.session_state.escolha_letra == resposta_letra_correta:
         st.markdown(
@@ -199,7 +199,7 @@ elif st.session_state.fase == "resultado":
             "<h1 style='color:red; font-weight:bold; text-align:center;'>❌ ERROU!</h1>",
             unsafe_allow_html=True
         )
-        st.info(f"A resposta correta era: **{resposta_letra_correta} - {resposta_nome_correta}**")
+        st.info(f"A resposta correta era: **{resposta_nome_correta}**")
 
     st.subheader("📊 Placar Atual")
     st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
