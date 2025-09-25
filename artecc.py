@@ -2,6 +2,7 @@
 import streamlit as st
 import random
 import os
+import time
 
 st.set_page_config(page_title="ARTECC 2025 - 3º Ano - Ambientes Sonoros", layout="centered")
 
@@ -28,7 +29,31 @@ if "modo_arquivos" not in st.session_state:
     st.session_state.modo_arquivos = None  # 'upload' ou 'repositorio'
 
 # -----------------------------
-# UI - Título centralizado em duas linhas
+# CSS para visual mais atraente
+# -----------------------------
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: linear-gradient(to right, #f9f9f9, #e0f7fa);
+    }
+    .card {
+        border: 2px solid #4CAF50; 
+        border-radius: 10px; 
+        padding: 15px; 
+        margin: 5px; 
+        background-color: #f0f8ff;
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -----------------------------
+# Título principal
 # -----------------------------
 st.markdown(
     """
@@ -70,7 +95,7 @@ if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == 
         else:
             st.session_state.arquivos = arquivos
             st.write(f"{len(arquivos)} arquivos carregados.")
-            if st.button("Iniciar Jogo"):
+            if st.button("🎮 Iniciar Jogo"):
                 st.session_state.fase = "tocando_audio"
                 st.rerun()
     else:
@@ -94,7 +119,7 @@ elif st.session_state.modo_arquivos == "upload" and st.session_state.fase == "co
 
     st.write(f"Arquivos carregados: {len(st.session_state.arquivos)}")
     if len(st.session_state.arquivos) >= 5:
-        if st.button("Iniciar Jogo"):
+        if st.button("🎮 Iniciar Jogo"):
             st.session_state.fase = "tocando_audio"
             st.rerun()
 
@@ -114,38 +139,41 @@ elif st.session_state.fase == "tocando_audio":
         st.session_state.escolha_letra = None
 
     arquivo_bytes = st.session_state.arquivos_rodada[st.session_state.resposta_correta]["bytes"]
-    st.subheader("Clique no play e tente identificar qual o ambiente:")
-    st.audio(arquivo_bytes, format="audio/mpeg")
 
-    # Exibe opções (as letras são apenas para o jogador escolher)
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.subheader("🎵 Ouça o áudio e identifique o ambiente")
+        st.audio(arquivo_bytes, format="audio/mpeg")
+    with col2:
+        st.subheader("📊 Placar")
+        st.metric("✅ Acertos", st.session_state.placar["acertos"])
+        st.metric("❌ Erros", st.session_state.placar["erros"])
+        if st.button("🔄 Resetar Placar"):
+            st.session_state.placar = {"acertos": 0, "erros": 0}
+            st.rerun()
+
+    # Exibe opções como cards coloridos
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letter = {}
     display_opcoes = []
 
+    st.subheader("Escolha uma opção:")
+    cols = st.columns(5)
     for i, (file_key, meta) in enumerate(sorted_items):
         letra = chr(ord("a") + i)
         filekey_to_letter[file_key] = letra
-        display_opcoes.append(f"{letra} - {meta['nome']}")
-
-    st.session_state.escolha_letra = st.radio(
-        "Escolha uma opção:",
-        options=display_opcoes,
-        key="resposta_jogador"
-    )
-
-    if st.button("Responder"):
-        st.session_state.escolha_letra = st.session_state.escolha_letra.split(" - ")[0]
-
-        if not st.session_state.placar_incrementado:
-            resposta_letra_correta = filekey_to_letter[st.session_state.resposta_correta]
-            if st.session_state.escolha_letra == resposta_letra_correta:
-                st.session_state.placar["acertos"] += 1
-            else:
-                st.session_state.placar["erros"] += 1
-            st.session_state.placar_incrementado = True
-
-        st.session_state.fase = "resultado"
-        st.rerun()
+        with cols[i]:
+            if st.button(f"{letra} - {meta['nome']}", key=f"opt_{letra}"):
+                st.session_state.escolha_letra = letra
+                if not st.session_state.placar_incrementado:
+                    resposta_letra_correta = filekey_to_letter[st.session_state.resposta_correta]
+                    if st.session_state.escolha_letra == resposta_letra_correta:
+                        st.session_state.placar["acertos"] += 1
+                    else:
+                        st.session_state.placar["erros"] += 1
+                    st.session_state.placar_incrementado = True
+                st.session_state.fase = "resultado"
+                st.rerun()
 
 # -----------------------------
 # Etapa: Mostrar resultado
@@ -176,7 +204,7 @@ elif st.session_state.fase == "resultado":
     st.subheader("📊 Placar Atual")
     st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
 
-    if st.button("Jogar novamente"):
+    if st.button("🔁 Jogar novamente"):
         st.session_state.arquivos_rodada = {}
         st.session_state.resposta_correta = None
         st.session_state.escolha_letra = None
