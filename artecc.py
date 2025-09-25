@@ -22,7 +22,7 @@ if "escolha_letra" not in st.session_state:
 if "placar" not in st.session_state:
     st.session_state.placar = {"acertos": 0, "erros": 0}
 if "placar_incrementado" not in st.session_state:
-    st.session_state.placar_incrementado = False  # variável auxiliar para evitar contagem múltipla
+    st.session_state.placar_incrementado = False  # evitar contagem múltipla
 
 # -----------------------------
 # UI
@@ -96,7 +96,7 @@ elif st.session_state.fase == "esperando_numero":
         idx_real = st.session_state.mapa_random[numero_escolhido]
         st.session_state.resposta_correta = idx_real
         st.session_state.fase = "tocando_audio"
-        st.session_state.placar_incrementado = False  # garantir flag zerada
+        st.session_state.placar_incrementado = False
         st.rerun()
 
 # -----------------------------
@@ -139,7 +139,7 @@ elif st.session_state.fase == "tocando_audio":
                 st.session_state.placar["acertos"] += 1
             else:
                 st.session_state.placar["erros"] += 1
-            st.session_state.placar_incrementado = True  # marca que já incrementou
+            st.session_state.placar_incrementado = True
 
         st.session_state.fase = "resultado"
         st.rerun()
@@ -158,11 +158,20 @@ elif st.session_state.fase == "resultado":
     resposta_letra_correta = filekey_to_letter[corret_key]
     resposta_nome_correta = st.session_state.arquivos[corret_key]["nome"]
 
+
+    # Exibir resultado com fonte maior, em bold e centralizado
     if st.session_state.escolha_letra == resposta_letra_correta:
-        st.success("🎉 ACERTOU!")
+        st.markdown(
+            "<h1 style='color:green; font-weight:bold; text-align:center;'>🎉 ACERTOU!</h1>",
+            unsafe_allow_html=True
+        )
     else:
-        st.error("❌ ERROU!")
+        st.markdown(
+            "<h1 style='color:red; font-weight:bold; text-align:center;'>❌ ERROU!</h1>",
+            unsafe_allow_html=True
+        )
         st.info(f"A resposta correta era: **{resposta_letra_correta} - {resposta_nome_correta}**")
+
 
     st.subheader("📊 Placar Atual")
     st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
