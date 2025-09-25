@@ -78,7 +78,7 @@ if st.session_state.fase == "config" and st.session_state.modo_arquivos is None:
         st.rerun()
 
 # -----------------------------
-# Carregar arquivos
+# Carregar arquivos da pasta do repositório
 # -----------------------------
 if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == "config":
     st.header("Arquivos carregados da pasta do repositório")
@@ -100,6 +100,9 @@ if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == 
     else:
         st.error(f"A pasta '{PASTA_ARQUIVOS}' não existe no repositório.")
 
+# -----------------------------
+# Upload pelo master
+# -----------------------------
 elif st.session_state.modo_arquivos == "upload" and st.session_state.fase == "config":
     st.header("Upload de arquivos pelo master (mínimo 5)")
     uploaded_files = st.file_uploader(
@@ -135,34 +138,39 @@ elif st.session_state.fase == "tocando_audio":
 
     arquivo_bytes = st.session_state.arquivos_rodada[st.session_state.resposta_correta]["bytes"]
 
-    col1, col2 = st.columns([2, 1])
+    # -----------------------------
+    # Placar em linha horizontal
+    # -----------------------------
+    col1, col2 = st.columns(2)
     with col1:
-        st.subheader("🎵 Ouça o áudio e tente identificar o ambiente")
-        st.audio(arquivo_bytes, format="audio/mpeg")
-    with col2:
-        st.subheader("📊 Placar")
         st.metric("✅ Acertos", st.session_state.placar["acertos"])
+    with col2:
         st.metric("❌ Erros", st.session_state.placar["erros"])
-        if st.button("🔄 Resetar Placar"):
-            st.session_state.placar = {"acertos": 0, "erros": 0}
-            st.rerun()
 
-    # Exibe opções em cards coloridos
+    if st.button("🔄 Resetar Placar"):
+        st.session_state.placar = {"acertos": 0, "erros": 0}
+        st.rerun()
+
+    # -----------------------------
+    # Player e instrução abaixo
+    # -----------------------------
+    st.subheader("🎵 Ouça o áudio e tente identificar o ambiente")
+    st.audio(arquivo_bytes, format="audio/mpeg")
+
+    # -----------------------------
+    # Opções em cards coloridos
+    # -----------------------------
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
     filekey_to_letra = {}
-    cols = st.columns(5)
     cores = ["#ff9999", "#99ccff", "#99ff99", "#ffcc99", "#d399ff"]
     st.subheader("Escolha uma opção:")
+    cols = st.columns(5)
     for i, (file_key, meta) in enumerate(sorted_items):
         letra = chr(ord("a") + i)
         filekey_to_letra[file_key] = letra
         nome_limpo = os.path.splitext(meta["nome"])[0]
         with cols[i]:
-            if st.button(
-                f"{nome_limpo}",
-                key=f"opt_{i}",
-                help="Clique para selecionar"
-            ):
+            if st.button(nome_limpo, key=f"opt_{i}", help="Clique para selecionar"):
                 st.session_state.escolha_letra = letra
                 if not st.session_state.placar_incrementado:
                     resposta_certa = st.session_state.resposta_correta
