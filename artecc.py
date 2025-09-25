@@ -111,17 +111,26 @@ elif st.session_state.fase == "tocando_audio":
     st.audio(arquivo_bytes, format="audio/mpeg")
 
     # Gerar opções a..e de forma estável (ordenando keys dos arquivos)
-    sorted_items = sorted(st.session_state.arquivos.items(), key=lambda x: x[0])  # [(1, {...}), (2,...), ...]
+    sorted_items = sorted(st.session_state.arquivos.items(), key=lambda x: x[0])
     opcoes = {}
     filekey_to_letter = {}
+    display_opcoes = []  # lista para mostrar texto "a - nome"
+
     for i, (file_key, meta) in enumerate(sorted_items):
         letra = chr(ord("a") + i)
         opcoes[letra] = meta["nome"]
         filekey_to_letter[file_key] = letra
+        display_opcoes.append(f"{letra} - {meta['nome']}")  # <-- Aqui é a mudança
 
-    st.session_state.escolha_letra = st.radio("Qual é a resposta correta?", list(opcoes.keys()), key="resposta_jogador")
+    st.session_state.escolha_letra = st.radio(
+        "Qual é a resposta correta?",
+        options=display_opcoes,
+        key="resposta_jogador"
+    )
 
     if st.button("Responder"):
+        # extrair apenas a letra escolhida
+        st.session_state.escolha_letra = st.session_state.escolha_letra.split(" - ")[0]
         st.session_state.fase = "resultado"
         st.rerun()
 
@@ -129,16 +138,14 @@ elif st.session_state.fase == "tocando_audio":
 # Etapa: Mostrar resultado
 # -----------------------------
 elif st.session_state.fase == "resultado":
-    # reconstrói as mesmas opções para garantir consistência
+    # Reconstruir as opções para referência
     sorted_items = sorted(st.session_state.arquivos.items(), key=lambda x: x[0])
-    opcoes = {}
     filekey_to_letter = {}
     for i, (file_key, meta) in enumerate(sorted_items):
         letra = chr(ord("a") + i)
-        opcoes[letra] = meta["nome"]
         filekey_to_letter[file_key] = letra
 
-    corret_key = st.session_state.resposta_correta  # ex: 3  (chave do arquivo 1..5)
+    corret_key = st.session_state.resposta_correta
     resposta_letra_correta = filekey_to_letter[corret_key]
     resposta_nome_correta = st.session_state.arquivos[corret_key]["nome"]
 
@@ -147,17 +154,8 @@ elif st.session_state.fase == "resultado":
         st.session_state.placar["acertos"] += 1
     else:
         st.error("❌ ERROU!")
-        st.info(f"A resposta correta era: **{resposta_letra_correta} → {resposta_nome_correta}**")
-        st.session_state.placar["erros"] += 1
+        st.info(f"A resposta correta era: **{resposta_letra_correta} - {resposta_nome_correta}**")
 
+    # Placar
     st.subheader("📊 Placar Atual")
-    st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
-
-    if st.button("Jogar novamente"):
-        # reseta apenas o necessário para uma nova rodada
-        st.session_state.mapa_random = {}
-        st.session_state.numero_escolhido = None
-        st.session_state.escolha_letra = None
-        st.session_state.resposta_correta = None
-        st.session_state.fase = "esperando_numero"
-        st.rerun()
+    st.write(f"✅ Acertos: {st.session_state.placar['acertos']()_
