@@ -159,7 +159,7 @@ elif st.session_state.fase == "tocando_audio":
     idx_real = st.session_state.resposta_correta
     arquivo_bytes = st.session_state.arquivos_rodada[idx_real]["bytes"]
 
-    st.subheader("O áudio será reproduzido abaixo:")
+    st.subheader("Clique no play e tente identificar qual o ambiente:")
     st.audio(arquivo_bytes, format="audio/mpeg")
 
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
