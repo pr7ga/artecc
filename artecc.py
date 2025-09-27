@@ -3,15 +3,12 @@ import streamlit as st
 import random
 import os
 
-# Toggle de debug (mude para True se quiser ver o estado interno)
-DEBUG = False
-
 st.set_page_config(page_title="ARTECC 2025 - 3º Ano - Ambientes Sonoros", layout="centered")
 
 PASTA_ARQUIVOS = "arquivos_mp3"
 
 # -----------------------------
-# Inicialização de session_state
+# Inicialização de sessão
 # -----------------------------
 if "arquivos" not in st.session_state:
     st.session_state.arquivos = {}  # filename -> {"bytes","nome"}
@@ -37,7 +34,7 @@ def can_start_round():
     return isinstance(st.session_state.arquivos, dict) and len(st.session_state.arquivos) >= 5
 
 def start_new_round():
-    """Cria arquivos_rodada_list (5 itens) e resposta_index (0..4)."""
+    """Cria uma lista de 5 arquivos para a rodada e escolhe um índice correto 0..4."""
     if not can_start_round():
         return False
     filenames = list(st.session_state.arquivos.keys())
@@ -49,48 +46,16 @@ def start_new_round():
     st.session_state.resposta_index = random.randrange(5)
     st.session_state.escolha_index = None
     st.session_state.placar_incrementado = False
-    # optional: round id for uniqueness if needed
-    st.session_state.round_id = st.session_state.get("round_id", 0) + 1
     return True
 
 def ensure_round():
-    """Garante que arquivos_rodada_list exista e tenha 5 itens; tenta start_new_round se não."""
+    """Garante que arquivos_rodada_list válida exista; tenta iniciar nova rodada se não."""
     if not isinstance(st.session_state.arquivos_rodada_list, list) or len(st.session_state.arquivos_rodada_list) != 5:
         return start_new_round()
     return True
 
-def safe_get_arquivo_bytes():
-    """Retorna bytes do arquivo correto ou None (sem lançar)."""
-    try:
-        ri = st.session_state.resposta_index
-        if ri is None:
-            return None
-        lst = st.session_state.arquivos_rodada_list
-        if not isinstance(lst, list) or len(lst) != 5:
-            return None
-        meta = lst[ri]
-        if not isinstance(meta, dict):
-            return None
-        return meta.get("bytes")
-    except Exception:
-        return None
-
 # -----------------------------
-# (Opcional) mostrar debug
-# -----------------------------
-if DEBUG:
-    st.sidebar.header("DEBUG")
-    st.sidebar.write("fase:", st.session_state.fase)
-    st.sidebar.write("modo_arquivos:", st.session_state.modo_arquivos)
-    st.sidebar.write("arquivos keys:", list(st.session_state.arquivos.keys()))
-    st.sidebar.write("arquivos_rodada_list length:", len(st.session_state.arquivos_rodada_list))
-    st.sidebar.write("resposta_index:", st.session_state.resposta_index)
-    st.sidebar.write("escolha_index:", st.session_state.escolha_index)
-    st.sidebar.write("placar_incrementado:", st.session_state.placar_incrementado)
-    st.sidebar.write("round_id:", st.session_state.get("round_id"))
-
-# -----------------------------
-# CSS leve (opcional)
+# CSS simples (opcional)
 # -----------------------------
 st.markdown(
     """
@@ -194,18 +159,26 @@ elif st.session_state.fase == "tocando_audio":
     if not can_start_round():
         st.warning("Não há arquivos suficientes. Volte à configuração.")
     else:
-        # garantir rodada válida (tenta criar se não existir)
-        ok = ensure_round()
-        if not ok:
+        # garantir rodada válida
+        if not ensure_round():
             st.warning("Não foi possível iniciar a rodada. Verifique os arquivos.")
         else:
-            # pegar bytes do arquivo correto de forma segura
-            arquivo_bytes = safe_get_arquivo_bytes()
+            # pegar bytes com guardas
+            ri = st.session_state.resposta_index
+            if ri is None or not (0 <= ri < len(st.session_state.arquivos_rodada_list)):
+                # estado inconsistente: reinicia rodada
+                started = start_new_round()
+                if not started:
+                    st.warning("Erro ao iniciar nova rodada.")
+                    st.rerun()
+                ri = st.session_state.resposta_index
+
+            arquivo_meta = st.session_state.arquivos_rodada_list[ri]
+            arquivo_bytes = arquivo_meta.get("bytes") if arquivo_meta else None
             if arquivo_bytes is None:
-                # se não conseguimos obter bytes, reiniciamos a rodada e tentamos novamente
-                st.warning("Estado inconsistente detectado — reiniciando rodada.")
+                st.warning("Erro ao acessar áudio — reiniciando rodada.")
                 start_new_round()
-                st.experimental_rerun()
+                st.rerun()
 
             # Placar horizontal
             col1, col2 = st.columns(2)
@@ -225,12 +198,12 @@ elif st.session_state.fase == "tocando_audio":
             st.subheader("Escolha uma opção:")
             cols = st.columns(5)
             for i, meta in enumerate(st.session_state.arquivos_rodada_list):
-                nome_limpo = os.path.splitext(meta.get("nome", ""))[0]
+                nome_limpo = os.path.splitext(meta["nome"])[0]
                 with cols[i]:
-                    # key garante botão único por posição; round_id ajuda se quiser variar a key por rodada
-                    if st.button(nome_limpo, key=f"opt_{i}_r{st.session_state.get('round_id',0)}"):
+                    if st.button(nome_limpo, key=f"opt_{i}"):
                         st.session_state.escolha_index = i
                         if not st.session_state.placar_incrementado:
+                            # conta apenas se ainda não contou essa rodada
                             if st.session_state.escolha_index == st.session_state.resposta_index:
                                 st.session_state.placar["acertos"] += 1
                             else:
@@ -243,24 +216,25 @@ elif st.session_state.fase == "tocando_audio":
 # Resultado
 # -----------------------------
 elif st.session_state.fase == "resultado":
-    # valida estado da rodada
+    # valida estado
     rod = st.session_state.get("arquivos_rodada_list", [])
     if not isinstance(rod, list) or len(rod) != 5:
         st.warning("Estado inconsistente na tela de resultado — reiniciando rodada.")
-        ok = start_new_round()
-        if ok:
-            st.session_state.fase = "tocando_audio"
-        else:
+        started = start_new_round()
+        if not started:
             st.session_state.fase = "config"
+        else:
+            st.session_state.fase = "tocando_audio"
         st.rerun()
     else:
         ri = st.session_state.resposta_index
         ei = st.session_state.escolha_index
-        if ri is None:
-            st.warning("Resposta inválida — reiniciando rodada.")
+        # guardas adicionais
+        if ri is None or not (0 <= ri < 5):
+            st.warning("Estado inconsistente (resposta). Reiniciando rodada.")
             start_new_round()
             st.rerun()
-        nome_correto = os.path.splitext(st.session_state.arquivos_rodada_list[ri].get("nome",""))[0]
+        nome_correto = os.path.splitext(st.session_state.arquivos_rodada_list[ri]["nome"])[0]
 
         if ei == ri:
             st.markdown("<h1 style='color:green; font-weight:bold; text-align:center;'>🎉 ACERTOU!</h1>", unsafe_allow_html=True)
@@ -272,9 +246,9 @@ elif st.session_state.fase == "resultado":
         st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
 
         if st.button("🔁 Jogar novamente"):
-            ok = start_new_round()
-            if ok:
-                st.session_state.fase = "tocando_audio"
-            else:
+            started = start_new_round()
+            if not started:
                 st.session_state.fase = "config"
+            else:
+                st.session_state.fase = "tocando_audio"
             st.rerun()
