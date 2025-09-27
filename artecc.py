@@ -11,15 +11,15 @@ PASTA_ARQUIVOS = "arquivos_mp3"
 # Inicialização de sessão
 # -----------------------------
 if "arquivos" not in st.session_state:
-    st.session_state.arquivos = {}  # todos os arquivos disponíveis (filename -> {"bytes","nome"})
+    st.session_state.arquivos = {}  # filename -> {"bytes","nome"}
 if "fase" not in st.session_state:
     st.session_state.fase = "config"  # config, tocando_audio, resultado
-if "arquivos_rodada" not in st.session_state:
-    st.session_state.arquivos_rodada = {}  # mapa 1..5 -> meta
-if "resposta_correta" not in st.session_state:
-    st.session_state.resposta_correta = None
-if "escolha_letra" not in st.session_state:
-    st.session_state.escolha_letra = None
+if "arquivos_rodada_list" not in st.session_state:
+    st.session_state.arquivos_rodada_list = []  # lista de 5 metas
+if "resposta_index" not in st.session_state:
+    st.session_state.resposta_index = None  # 0..4
+if "escolha_index" not in st.session_state:
+    st.session_state.escolha_index = None
 if "placar" not in st.session_state:
     st.session_state.placar = {"acertos": 0, "erros": 0}
 if "placar_incrementado" not in st.session_state:
@@ -31,49 +31,40 @@ if "modo_arquivos" not in st.session_state:
 # Funções utilitárias
 # -----------------------------
 def can_start_round():
-    """Retorna True se há arquivos suficientes para sortear 5."""
     return isinstance(st.session_state.arquivos, dict) and len(st.session_state.arquivos) >= 5
 
 def start_new_round():
-    """Inicializa uma nova rodada: seleciona 5 arquivos e escolhe a resposta correta."""
-    # validação
+    """Cria uma lista de 5 arquivos para a rodada e escolhe um índice correto 0..4."""
     if not can_start_round():
         return False
+    filenames = list(st.session_state.arquivos.keys())
     try:
-        arquivos_sorteados = random.sample(list(st.session_state.arquivos.keys()), 5)
+        sampled = random.sample(filenames, 5)
     except Exception:
         return False
-    st.session_state.arquivos_rodada = {i+1: st.session_state.arquivos[k] for i, k in enumerate(arquivos_sorteados)}
-    # escolhe a chave 1..5 que será a correta
-    st.session_state.resposta_correta = random.choice(list(st.session_state.arquivos_rodada.keys()))
-    st.session_state.escolha_letra = None
+    st.session_state.arquivos_rodada_list = [st.session_state.arquivos[f] for f in sampled]
+    st.session_state.resposta_index = random.randrange(5)
+    st.session_state.escolha_index = None
     st.session_state.placar_incrementado = False
     return True
 
-def safe_sorted_rodada_items():
-    """Retorna lista ordenada de itens da rodada; se inconsistent, tenta reiniciar rodada."""
-    ar = st.session_state.get("arquivos_rodada")
-    if not isinstance(ar, dict) or len(ar) != 5:
-        ok = start_new_round()
-        if not ok:
-            return []
-    # se ainda inválido, devolve lista vazia
-    ar = st.session_state.get("arquivos_rodada")
-    if not isinstance(ar, dict):
-        return []
-    return sorted(ar.items(), key=lambda x: x[0])
+def ensure_round():
+    """Garante que arquivos_rodada_list válida exista; tenta iniciar nova rodada se não."""
+    if not isinstance(st.session_state.arquivos_rodada_list, list) or len(st.session_state.arquivos_rodada_list) != 5:
+        return start_new_round()
+    return True
 
 # -----------------------------
-# CSS (opcional)
+# CSS simples (opcional)
 # -----------------------------
 st.markdown(
     """
     <style>
     .card {
-        border-radius: 15px;
-        padding: 14px;
+        border-radius: 12px;
+        padding: 12px;
         margin: 6px;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: bold;
         text-align: center;
         background-color: #f6f9ff;
@@ -84,7 +75,7 @@ st.markdown(
 )
 
 # -----------------------------
-# Título
+# Cabeçalho
 # -----------------------------
 st.markdown(
     """
@@ -97,7 +88,7 @@ st.markdown(
 )
 
 # -----------------------------
-# Escolha do modo de arquivos (apenas em config)
+# Fluxo: escolha de fonte (apenas em config)
 # -----------------------------
 if st.session_state.fase == "config" and st.session_state.modo_arquivos is None:
     st.header("Escolha a fonte dos arquivos de áudio")
@@ -127,12 +118,11 @@ if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == 
             st.session_state.arquivos = arquivos_locais
             st.write(f"{len(arquivos_locais)} arquivos disponíveis.")
             if st.button("🎮 Iniciar Jogo"):
-                # ao iniciar, inicializa rodada imediatamente
-                started = start_new_round()
-                if started:
+                ok = start_new_round()
+                if ok:
                     st.session_state.fase = "tocando_audio"
                 else:
-                    st.error("Erro ao iniciar rodada. Verifique os arquivos.")
+                    st.error("Erro ao iniciar rodada.")
                 st.rerun()
     else:
         st.error(f"A pasta '{PASTA_ARQUIVOS}' não existe no repositório.")
@@ -155,40 +145,40 @@ elif st.session_state.modo_arquivos == "upload" and st.session_state.fase == "co
     st.write(f"Arquivos carregados: {len(st.session_state.arquivos)}")
     if len(st.session_state.arquivos) >= 5:
         if st.button("🎮 Iniciar Jogo"):
-            started = start_new_round()
-            if started:
+            ok = start_new_round()
+            if ok:
                 st.session_state.fase = "tocando_audio"
             else:
-                st.error("Erro ao iniciar rodada. Verifique os arquivos.")
+                st.error("Erro ao iniciar rodada.")
             st.rerun()
 
 # -----------------------------
-# Tocando áudio / Jogador escolhe
+# Tocando áudio / seleção do jogador
 # -----------------------------
 elif st.session_state.fase == "tocando_audio":
-    # garanta que há arquivos suficientes
     if not can_start_round():
-        st.warning("Não há arquivos suficientes para iniciar o jogo. Volte à configuração.")
+        st.warning("Não há arquivos suficientes. Volte à configuração.")
     else:
-        # garantir que arquivos_rodada/resposta_correta válidos
-        items = safe_sorted_rodada_items()
-        if not items:
-            st.warning("Não foi possível iniciar a rodada — verifique os arquivos e tente novamente.")
+        # garantir rodada válida
+        if not ensure_round():
+            st.warning("Não foi possível iniciar a rodada. Verifique os arquivos.")
         else:
-            # pegar bytes do arquivo correto (com guard)
-            correct_key = st.session_state.get("resposta_correta")
-            if correct_key not in st.session_state.arquivos_rodada:
-                # reinicia rodada se inconsistente
-                start_new_round()
-                items = safe_sorted_rodada_items()
-            arquivo_meta = st.session_state.arquivos_rodada.get(st.session_state.resposta_correta)
+            # pegar bytes com guardas
+            ri = st.session_state.resposta_index
+            if ri is None or not (0 <= ri < len(st.session_state.arquivos_rodada_list)):
+                # estado inconsistente: reinicia rodada
+                started = start_new_round()
+                if not started:
+                    st.warning("Erro ao iniciar nova rodada.")
+                    st.rerun()
+                ri = st.session_state.resposta_index
+
+            arquivo_meta = st.session_state.arquivos_rodada_list[ri]
             arquivo_bytes = arquivo_meta.get("bytes") if arquivo_meta else None
             if arquivo_bytes is None:
-                st.warning("Erro ao acessar o áudio da rodada — reiniciando rodada.")
-                st.session_state.arquivos_rodada = {}
-                st.session_state.resposta_correta = None
-                st.session_state.placar_incrementado = False
-                st.experimental_rerun()
+                st.warning("Erro ao acessar áudio — reiniciando rodada.")
+                start_new_round()
+                st.rerun()
 
             # Placar horizontal
             col1, col2 = st.columns(2)
@@ -204,30 +194,17 @@ elif st.session_state.fase == "tocando_audio":
             st.subheader("🎵 Ouça o áudio e tente identificar o ambiente")
             st.audio(arquivo_bytes, format="audio/mpeg")
 
-            # Opções (5 colunas)
+            # Opções em 5 colunas
             st.subheader("Escolha uma opção:")
-            sorted_items = items  # já validado
-            filekey_to_letra = {}
             cols = st.columns(5)
-            for i, (file_key, meta) in enumerate(sorted_items):
-                letra = chr(ord("a") + i)
-                filekey_to_letra[file_key] = letra
+            for i, meta in enumerate(st.session_state.arquivos_rodada_list):
                 nome_limpo = os.path.splitext(meta["nome"])[0]
                 with cols[i]:
                     if st.button(nome_limpo, key=f"opt_{i}"):
-                        # confirmação de consistência antes de contar
-                        if st.session_state.resposta_correta not in filekey_to_letra:
-                            # estado inconsistente — reinicia rodada
-                            st.warning("Estado inconsistente detectado — reiniciando rodada.")
-                            st.session_state.arquivos_rodada = {}
-                            st.session_state.resposta_correta = None
-                            st.session_state.escolha_letra = None
-                            st.session_state.placar_incrementado = False
-                            st.rerun()
-                        st.session_state.escolha_letra = letra
+                        st.session_state.escolha_index = i
                         if not st.session_state.placar_incrementado:
-                            letra_correta = filekey_to_letra[st.session_state.resposta_correta]
-                            if st.session_state.escolha_letra == letra_correta:
+                            # conta apenas se ainda não contou essa rodada
+                            if st.session_state.escolha_index == st.session_state.resposta_index:
                                 st.session_state.placar["acertos"] += 1
                             else:
                                 st.session_state.placar["erros"] += 1
@@ -240,51 +217,38 @@ elif st.session_state.fase == "tocando_audio":
 # -----------------------------
 elif st.session_state.fase == "resultado":
     # valida estado
-    if not isinstance(st.session_state.arquivos_rodada, dict) or len(st.session_state.arquivos_rodada) != 5:
+    rod = st.session_state.get("arquivos_rodada_list", [])
+    if not isinstance(rod, list) or len(rod) != 5:
         st.warning("Estado inconsistente na tela de resultado — reiniciando rodada.")
-        st.session_state.fase = "tocando_audio"
-        st.session_state.arquivos_rodada = {}
-        st.session_state.resposta_correta = None
-        st.session_state.escolha_letra = None
-        st.session_state.placar_incrementado = False
-        st.rerun()
-
-    sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
-    filekey_to_letra = {file_key: chr(ord("a") + i) for i, (file_key, meta) in enumerate(sorted_items)}
-    corret_key = st.session_state.resposta_correta
-
-    # guard: corret_key deve existir
-    if corret_key not in filekey_to_letra:
-        st.warning("Estado inconsistente detectado — reiniciando rodada.")
-        st.session_state.arquivos_rodada = {}
-        st.session_state.resposta_correta = None
-        st.session_state.escolha_letra = None
-        st.session_state.placar_incrementado = False
-        st.session_state.fase = "tocando_audio"
-        st.rerun()
-
-    letra_correta = filekey_to_letra[corret_key]
-    nome_correto = os.path.splitext(st.session_state.arquivos_rodada[corret_key]["nome"])[0]
-
-    if st.session_state.escolha_letra == letra_correta:
-        st.markdown("<h1 style='color:green; font-weight:bold; text-align:center;'>🎉 ACERTOU!</h1>", unsafe_allow_html=True)
-    else:
-        st.markdown("<h1 style='color:red; font-weight:bold; text-align:center;'>❌ ERROU!</h1>", unsafe_allow_html=True)
-        st.info(f"A resposta correta era: **{nome_correto}**")
-
-    st.subheader("📊 Placar Atual")
-    st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
-
-    if st.button("🔁 Jogar novamente"):
-        st.session_state.arquivos_rodada = {}
-        st.session_state.resposta_correta = None
-        st.session_state.escolha_letra = None
-        st.session_state.placar_incrementado = False
-        # inicia nova rodada imediatamente
         started = start_new_round()
         if not started:
-            # se não der pra iniciar (por falta de arquivos), volta pra config
             st.session_state.fase = "config"
         else:
             st.session_state.fase = "tocando_audio"
         st.rerun()
+    else:
+        ri = st.session_state.resposta_index
+        ei = st.session_state.escolha_index
+        # guardas adicionais
+        if ri is None or not (0 <= ri < 5):
+            st.warning("Estado inconsistente (resposta). Reiniciando rodada.")
+            start_new_round()
+            st.rerun()
+        nome_correto = os.path.splitext(st.session_state.arquivos_rodada_list[ri]["nome"])[0]
+
+        if ei == ri:
+            st.markdown("<h1 style='color:green; font-weight:bold; text-align:center;'>🎉 ACERTOU!</h1>", unsafe_allow_html=True)
+        else:
+            st.markdown("<h1 style='color:red; font-weight:bold; text-align:center;'>❌ ERROU!</h1>", unsafe_allow_html=True)
+            st.info(f"A resposta correta era: **{nome_correto}**")
+
+        st.subheader("📊 Placar Atual")
+        st.write(f"✅ Acertos: {st.session_state.placar['acertos']} | ❌ Erros: {st.session_state.placar['erros']}")
+
+        if st.button("🔁 Jogar novamente"):
+            started = start_new_round()
+            if not started:
+                st.session_state.fase = "config"
+            else:
+                st.session_state.fase = "tocando_audio"
+            st.rerun()
