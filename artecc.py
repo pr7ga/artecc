@@ -77,7 +77,8 @@ if st.session_state.fase == "config" and st.session_state.modo_arquivos is None:
         ["Pasta no repositório", "Upload pelo master"]
     )
     if st.button("Confirmar escolha"):
-        st.session_state.modo_arquivos = "repositorio" if escolha == "Pasta no repositório" else "upload"
+        st.session_state.modo_arquivos = "repositorio" if escolha == "Pasta no repositorio" else "upload"
+        # note: corrige texto exibido por segurança
         st.rerun()
 
 # -----------------------------
@@ -88,7 +89,7 @@ if st.session_state.modo_arquivos == "repositorio" and st.session_state.fase == 
     arquivos = {}
     if os.path.exists(PASTA_ARQUIVOS):
         for filename in os.listdir(PASTA_ARQUIVOS):
-            if filename.endswith(".mp3"):
+            if filename.lower().endswith(".mp3"):
                 filepath = os.path.join(PASTA_ARQUIVOS, filename)
                 with open(filepath, "rb") as f:
                     arquivos[filename] = {"bytes": f.read(), "nome": filename}
@@ -129,72 +130,110 @@ elif st.session_state.modo_arquivos == "upload" and st.session_state.fase == "co
 # Rodada e escolha do jogador
 # -----------------------------
 elif st.session_state.fase == "tocando_audio":
-    # Sorteia arquivos da rodada
-    if not st.session_state.arquivos_rodada:
-        arquivos_sorteados = random.sample(list(st.session_state.arquivos.keys()), 5)
-        st.session_state.arquivos_rodada = {
-            i+1: st.session_state.arquivos[k] for i, k in enumerate(arquivos_sorteados)
-        }
-        st.session_state.resposta_correta = random.choice(list(st.session_state.arquivos_rodada.keys()))
-        st.session_state.placar_incrementado = False
-        st.session_state.escolha_letra = None
+    # Certificar que há arquivos suficientes
+    if not st.session_state.arquivos or len(st.session_state.arquivos) < 5:
+        st.warning("Não há arquivos suficientes. Volte à configuração.")
+    else:
+        # Sorteia arquivos da rodada
+        if not st.session_state.arquivos_rodada:
+            arquivos_sorteados = random.sample(list(st.session_state.arquivos.keys()), 5)
+            st.session_state.arquivos_rodada = {
+                i+1: st.session_state.arquivos[k] for i, k in enumerate(arquivos_sorteados)
+            }
+            st.session_state.resposta_correta = random.choice(list(st.session_state.arquivos_rodada.keys()))
+            st.session_state.placar_incrementado = False
+            st.session_state.escolha_letra = None
 
-    arquivo_bytes = st.session_state.arquivos_rodada[st.session_state.resposta_correta]["bytes"]
+        arquivo_bytes = st.session_state.arquivos_rodada.get(st.session_state.resposta_correta, {}).get("bytes")
+        if arquivo_bytes is None:
+            # estado inconsistente: reiniciar rodada
+            st.warning("Estado inconsistente detectado — reiniciando rodada.")
+            st.session_state.arquivos_rodada = {}
+            st.session_state.resposta_correta = None
+            st.session_state.placar_incrementado = False
+            st.session_state.escolha_letra = None
+            st.experimental_rerun()
 
-    # -----------------------------
-    # Placar em linha horizontal
-    # -----------------------------
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("✅ Acertos", st.session_state.placar["acertos"])
-    with col2:
-        st.metric("❌ Erros", st.session_state.placar["erros"])
-    if st.button("🔄 Resetar Placar"):
-        st.session_state.placar = {"acertos": 0, "erros": 0}
-        st.rerun()
+        # -----------------------------
+        # Placar em linha horizontal
+        # -----------------------------
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("✅ Acertos", st.session_state.placar["acertos"])
+        with col2:
+            st.metric("❌ Erros", st.session_state.placar["erros"])
+        if st.button("🔄 Resetar Placar"):
+            st.session_state.placar = {"acertos": 0, "erros": 0}
+            st.rerun()
 
-    # -----------------------------
-    # Player abaixo
-    # -----------------------------
-    st.subheader("🎵 Ouça o áudio e tente identificar o ambiente")
-    st.audio(arquivo_bytes, format="audio/mpeg")
+        # -----------------------------
+        # Player abaixo
+        # -----------------------------
+        st.subheader("🎵 Ouça o áudio e tente identificar o ambiente")
+        st.audio(arquivo_bytes, format="audio/mpeg")
 
-    # -----------------------------
-    # Opções em cards
-    # -----------------------------
-    sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
-    filekey_to_letra = {}
-    st.subheader("Escolha uma opção:")
-    cols = st.columns(5)
-    for i, (file_key, meta) in enumerate(sorted_items):
-        letra = chr(ord("a") + i)
-        filekey_to_letra[file_key] = letra
-        nome_limpo = os.path.splitext(meta["nome"])[0]
-        with cols[i]:
-            if st.button(nome_limpo, key=f"opt_{i}"):
-                st.session_state.escolha_letra = letra
-                if not st.session_state.placar_incrementado:
-                    resposta_certa = st.session_state.resposta_correta
-                    letra_correta = filekey_to_letra[resposta_certa]
-                    if st.session_state.escolha_letra == letra_correta:
-                        st.session_state.placar["acertos"] += 1
-                    else:
-                        st.session_state.placar["erros"] += 1
-                    st.session_state.placar_incrementado = True
-                st.session_state.fase = "resultado"
-                st.rerun()
+        # -----------------------------
+        # Opções em cards
+        # -----------------------------
+        sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
+        filekey_to_letra = {}
+        st.subheader("Escolha uma opção:")
+        cols = st.columns(5)
+        for i, (file_key, meta) in enumerate(sorted_items):
+            letra = chr(ord("a") + i)
+            filekey_to_letra[file_key] = letra
+            nome_limpo = os.path.splitext(meta["nome"])[0]
+            with cols[i]:
+                if st.button(nome_limpo, key=f"opt_{i}"):
+                    st.session_state.escolha_letra = letra
+                    if not st.session_state.placar_incrementado:
+                        # garantir que resposta_correta ainda pertença à rodada
+                        resposta_certa = st.session_state.resposta_correta
+                        if resposta_certa not in filekey_to_letra:
+                            # inconsistencia: reinicia rodada em vez de crashar
+                            st.warning("Estado inconsistente detectado — reiniciando rodada.")
+                            st.session_state.arquivos_rodada = {}
+                            st.session_state.resposta_correta = None
+                            st.session_state.placar_incrementado = False
+                            st.session_state.escolha_letra = None
+                            st.rerun()
+                        letra_correta = filekey_to_letra[resposta_certa]
+                        if st.session_state.escolha_letra == letra_correta:
+                            st.session_state.placar["acertos"] += 1
+                        else:
+                            st.session_state.placar["erros"] += 1
+                        st.session_state.placar_incrementado = True
+                    st.session_state.fase = "resultado"
+                    st.rerun()
 
 # -----------------------------
 # Resultado
 # -----------------------------
 elif st.session_state.fase == "resultado":
+    # reconstruir mapeamento das opções atuais
+    if not st.session_state.arquivos_rodada:
+        st.warning("Estado inconsistente na tela de resultado — reiniciando rodada.")
+        st.session_state.fase = "tocando_audio"
+        st.session_state.arquivos_rodada = {}
+        st.session_state.resposta_correta = None
+        st.session_state.escolha_letra = None
+        st.session_state.placar_incrementado = False
+        st.rerun()
+
     sorted_items = sorted(st.session_state.arquivos_rodada.items(), key=lambda x: x[0])
-    filekey_to_letra = {}
-    for i, (file_key, meta) in enumerate(sorted_items):
-        letra = chr(ord("a") + i)
-        filekey_to_letra[file_key] = letra
+    filekey_to_letra = {file_key: chr(ord("a") + i) for i, (file_key, meta) in enumerate(sorted_items)}
 
     corret_key = st.session_state.resposta_correta
+    # guard: se corret_key não estiver mais nas keys, reinicia rodada
+    if corret_key not in filekey_to_letra:
+        st.warning("Estado inconsistente detectado — reiniciando rodada.")
+        st.session_state.arquivos_rodada = {}
+        st.session_state.resposta_correta = None
+        st.session_state.escolha_letra = None
+        st.session_state.placar_incrementado = False
+        st.session_state.fase = "tocando_audio"
+        st.rerun()
+
     letra_correta = filekey_to_letra[corret_key]
     nome_correto = os.path.splitext(st.session_state.arquivos_rodada[corret_key]["nome"])[0]
 
